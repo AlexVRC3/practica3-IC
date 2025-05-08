@@ -1,4 +1,5 @@
 import numpy as np
+from collections import defaultdict
 
 class Lloyd:
     def __init__(self, puntos, centros, tolerancia=1e-10, num_max_iter=10, r_aprendizaje=0.1):
@@ -14,11 +15,9 @@ class Lloyd:
         while num_iter < self.num_max_iter:
             num_iter += 1
             self.centros_ant = [np.copy(c) for c in self.centros]
-            actualiza = 0
             for i, punto in enumerate(self.puntos):
                 indice_mejor = self.competicion(punto)
                 self.actualiza_centro(indice_mejor, i)
-            
             if self.fin():
                 break
 
@@ -48,30 +47,38 @@ class Lloyd:
         self.centros = [np.array(c) for c in centros]
         self.centros_ant = []
 
-
-def cargar_datos(ruta_archivo):
+def cargar_datos_con_clase(ruta_archivo):
     puntos = []
+    etiquetas = []
     with open(ruta_archivo, 'r') as f:
         for line in f:
             if line.strip():
                 partes = line.strip().split(",")
-                puntos.append(list(map(float, partes[:4])))  # solo atributos numéricos
-    return puntos
+                puntos.append(list(map(float, partes[:4])))
+                etiquetas.append(partes[4])
+    return puntos, etiquetas
 
 def cargar_test_punto(ruta_archivo):
     with open(ruta_archivo, 'r') as f:
         line = f.readline().strip()
         partes = line.split(",")
-        return list(map(float, partes[:4]))  # solo convierte los primeros 4 atributos a float
+        return list(map(float, partes[:4]))
 
+def mapear_clusters_lloyd(modelo, puntos, etiquetas):
+    conteo = defaultdict(lambda: defaultdict(int))
+    for punto, clase in zip(puntos, etiquetas):
+        cluster = modelo.clasificar_nuevo(punto)
+        conteo[cluster][clase] += 1
+    print("\nMapeo de clusters a clases (Lloyd):")
+    for cluster, clases in conteo.items():
+        print(f"Cluster {cluster}:")
+        for clase, cuenta in clases.items():
+            print(f"  {clase}: {cuenta} ejemplos")
 
 if __name__ == "__main__":
-    # Cargar los datos de entrenamiento desde un archivo
-    puntos = cargar_datos("../Iris2Clases.txt")
-    k = 2  # porque Iris2Clases.txt tiene 2 clases
-    centros_iniciales = puntos[:k]  # Se toman los primeros k puntos como centros iniciales
-
-    # Crear y entrenar el modelo de Lloyd
+    puntos, etiquetas = cargar_datos_con_clase("../Iris2Clases.txt")
+    k = 2
+    centros_iniciales = puntos[:k]
     modelo = Lloyd(puntos, centros_iniciales)
     modelo.execute()
 
@@ -79,10 +86,10 @@ if __name__ == "__main__":
     for c in modelo.get_centros():
         print(c)
 
-    # Clasificación de nuevos puntos de test
+    mapear_clusters_lloyd(modelo, puntos, etiquetas)
+
     print("\nClasificación de test:")
-    test_files = ["../TestIris01.txt", "../TestIris02.txt", "../TestIris03.txt"]
-    for testfile in test_files:
+    for testfile in ["../TestIris01.txt", "../TestIris02.txt", "../TestIris03.txt"]:
         punto = cargar_test_punto(testfile)
         cluster = modelo.clasificar_nuevo(punto)
         print(f"{testfile} => pertenece al cluster {cluster}")

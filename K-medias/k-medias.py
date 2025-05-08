@@ -1,4 +1,5 @@
 import numpy as np
+from collections import defaultdict
 
 class KMeansDifuso:
     def __init__(self, puntos, centros, tolerancia=0.01, b=2):
@@ -30,7 +31,7 @@ class KMeansDifuso:
         if dist_ij == 0:
             return 1.0
         num = (1.0 / dist_ij) ** (1 / (self.b - 1))
-        denom = sum((1.0 / self.distancia(c, self.puntos[j_punto])) ** (1 / (self.b - 1)) for c in self.centros)
+        denom = sum((1.0 / self.distancia(c, self.puntos[j_punto]) ** (1 / (self.b - 1)) if self.distancia(c, self.puntos[j_punto]) != 0 else float('inf')) for c in self.centros)
         return num / denom
 
     def actualiza_centros(self):
@@ -67,27 +68,38 @@ class KMeansDifuso:
         return self.U
 
 
-def cargar_datos(ruta_archivo):
+def cargar_datos_con_clase(ruta_archivo):
     puntos = []
+    etiquetas = []
     with open(ruta_archivo, 'r') as f:
         for line in f:
             if line.strip():
                 partes = line.strip().split(",")
-                puntos.append(list(map(float, partes[:4])))  # solo atributos numéricos
-    return puntos
+                puntos.append(list(map(float, partes[:4])))
+                etiquetas.append(partes[4])
+    return puntos, etiquetas
 
 def cargar_test_punto(ruta_archivo):
     with open(ruta_archivo, 'r') as f:
         line = f.readline().strip()
         partes = line.split(",")
-        return list(map(float, partes[:4]))  # solo convierte los primeros 4 atributos a float
+        return list(map(float, partes[:4]))
 
-
+def mapear_clusters_a_clases(modelo, etiquetas):
+    asignaciones = [np.argmax([modelo.U[i][j] for i in range(len(modelo.centros))]) for j in range(len(modelo.puntos))]
+    conteo = defaultdict(lambda: defaultdict(int))
+    for idx, cluster in enumerate(asignaciones):
+        clase = etiquetas[idx]
+        conteo[cluster][clase] += 1
+    print("\nMapeo de clusters a clases (K-Means Difuso):")
+    for cluster, clases in conteo.items():
+        print(f"Cluster {cluster}:")
+        for clase, cuenta in clases.items():
+            print(f"  {clase}: {cuenta} ejemplos")
 
 if __name__ == "__main__":
-    # Entrenamiento
-    puntos = cargar_datos("../Iris2Clases.txt")
-    k = 2  # porque Iris2Clases.txt tiene 2 clases
+    puntos, etiquetas = cargar_datos_con_clase("../Iris2Clases.txt")
+    k = 2
     centros_iniciales = puntos[:k]
     modelo = KMeansDifuso(puntos, centros_iniciales, tolerancia=0.01, b=2)
     modelo.execute()
@@ -95,6 +107,8 @@ if __name__ == "__main__":
     print("Centros finales:")
     for c in modelo.get_centros():
         print(c)
+
+    mapear_clusters_a_clases(modelo, etiquetas)
 
     print("\nClasificación de test:")
     for testfile in ["../TestIris01.txt", "../TestIris02.txt", "../TestIris03.txt"]:
